@@ -1,0 +1,114 @@
+--- 
+title: "Example Table"
+format: html
+--- 
+
+Here's a Great Table that also uses gt-extras:
+
+```{python}
+import polars as pl
+from great_tables import GT, html, style, loc
+from great_tables.data import gibraltar
+import gt_extras as gte
+
+# Convert to Polars DataFrame if needed
+df = pl.from_pandas(gibraltar)
+
+# Compute daily min/max for temp and humidity
+gibraltar_mini = (
+    df.group_by("date")
+    .agg(
+        [
+            pl.col("temp").min().alias("temp_low"),
+            pl.col("temp").max().alias("temp_high"),
+            (pl.col("humidity") * 100).min().alias("humidity_low"),
+            (pl.col("humidity") * 100).max().alias("humidity_high"),
+        ]
+    )
+    .with_columns(dow=pl.col("date").str.strptime(pl.Date).dt.strftime("%a"))
+    .sort("date")
+    .head(10)
+)
+
+# Make the Great Table (with a little help from gt-extras)
+(
+    GT(gibraltar_mini)
+    .tab_header(
+        title="Daily Temperature and Humidity Variation in Gibraltar",
+        subtitle="Summary is for the first ten days of May 2023"
+    )
+    .fmt_datetime(columns="date", format_str="%b %d")
+    .cols_align(align="center")
+    .tab_source_note(
+        html(
+"""
+<div style='display: flex; align-items: flex-start;'>
+  <div style='line-height: 1rem; margin-right: 2em; font-size: 0.95em; text-align: left;'>
+    Gibraltar International Airport<br>latitude: 36°09'N / longitude: 5°21'W / elevation: 5 m
+  </div>
+  <div style='line-height: 1rem; font-size: 0.95em; text-align: right; margin-left: auto;'>
+    <span style='color:blue;'>Blue</span>: Low<br>
+    <span style='color:red;'>Red</span>: High
+  </div>
+</div>
+"""
+            )
+        )
+    .pipe(
+        gte.gt_highlight_rows,
+        rows=[5, 6],
+        fill="#d7c7f6ff",
+        alpha=0.25
+    )
+    .tab_style(
+        style=style.text(align="right"),
+        locations=[loc.source_notes(), loc.stub()]
+    )
+    .tab_style(
+        style=style.borders(sides=["left", "right"], color="darkgray"),
+        locations=loc.body(columns="temp_low")
+    )
+    .tab_style(
+        style=style.css(
+            "background: linear-gradient(100deg, #e3f0fc 0%, #ffe3e3 100%);"
+        ),
+        locations=loc.body(columns="temp_low")
+    )
+    .tab_style(
+        style=style.css(
+            "background: linear-gradient(100deg, #e3f0fc 0%, #e3ffe3 100%);"
+        ),
+        locations=loc.body(columns="humidity_low")
+    )
+    .opt_horizontal_padding(scale=3)
+    .pipe(
+        gte.gt_plt_dumbbell,
+        col1="temp_low",
+        col2="temp_high",
+        col1_color="blue",
+        col2_color="red",
+        bar_color="lightgray",
+        label="Temperature Variation, °C",
+        num_decimals=1,
+        width=250,
+    )
+    .pipe(
+        gte.gt_plt_dumbbell,
+        col1="humidity_low",
+        col2="humidity_high",
+        col1_color="blue",
+        col2_color="red",
+        bar_color="lightgray",
+        label="Humidity Variation, %",
+        num_decimals=0,
+        width=250,
+    )
+    .pipe(
+        gte.gt_merge_stack,
+        col1="date",
+        col2="dow"
+    )
+    .pipe(gte.gt_theme_538)
+)
+```
+
